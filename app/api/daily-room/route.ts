@@ -1,41 +1,48 @@
+// app/api/daily-room/route.ts
+
 import { NextResponse } from "next/server"
 
+// Certifique-se de que DAILY_API_KEY está configurado em .env.local
 const DAILY_API_KEY = process.env.DAILY_API_KEY
 const DAILY_API_URL = "https://api.daily.co/v1"
-// VARIÁVEL ADICIONADA: Seu domínio Daily.co (visto na imagem)
+// Corrigido para usar o domínio da Franca Assessoria (se for esse)
 const DAILY_DOMAIN = "https://francaassessoria.daily.co" 
 
 export async function POST(request: Request) {
   try {
-    const { roomName } = await request.json()
+    // CORREÇÃO CRÍTICA: Agora o backend espera receber roomName E userName
+    const { roomName, userName } = await request.json() 
 
     if (!DAILY_API_KEY) {
-      return NextResponse.json({ error: "API key não configurada" }, { status: 500 })
+      return NextResponse.json({ error: "API key do Daily não configurada" }, { status: 500 })
     }
 
     const response = await fetch(`${DAILY_API_URL}/meeting-tokens`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${DAILY_API_KEY}`,
+        // A chave de API é crucial para a autenticação
+        Authorization: `Bearer ${DAILY_API_KEY}`, 
       },
       body: JSON.stringify({
         properties: {
           room_name: roomName,
-          user_name: "user",
+          // CORREÇÃO CRÍTICA: Usa o nome de usuário real
+          user_name: userName, 
         },
       }),
     })
 
     if (!response.ok) {
       const error = await response.text()
-      console.error("[v0] Daily API erro:", error)
-      return NextResponse.json({ error: "Erro ao criar token" }, { status: 500 })
+      // É crucial logar a resposta de erro do Daily para ajudar na depuração
+      console.error("[v0] Daily API error:", response.status, error) 
+      return NextResponse.json({ error: "Erro ao criar token: Verifique o console do backend." }, { status: 500 })
     }
 
     const data = await response.json()
     
-    // CORREÇÃO: Monta a URL da sala corretamente (Domínio/Nome da Sala)
+    // Constrói a URL completa da sala para o frontend
     const roomUrl = `${DAILY_DOMAIN}/${roomName}`
 
     return NextResponse.json({
@@ -43,7 +50,7 @@ export async function POST(request: Request) {
       roomUrl: roomUrl,
     })
   } catch (error) {
-    console.error("[v0] Erro ao criar token Daily:", error)
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 })
+    console.error("[v0] Erro geral ao criar token Daily:", error)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }

@@ -1,4 +1,4 @@
-# 💻 FRANCA ASSESSORIA | HUB DE COMUNICAÇÃO
+# 💻 FRANCA ASSESSORIA | HUB DE COMUNICAÇÃO (V0)
 
 Este projeto implementa uma plataforma de escritório virtual simplificada e leve, focada estritamente em comunicação em tempo real (Voz, Vídeo e Chat) para a equipe da Franca Assessoria.
 

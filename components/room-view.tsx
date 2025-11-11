@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-// Certifique-se de que a importação do DailyIframe esteja correta
 import DailyIframe from "@daily-co/daily-js" 
 import MediaControls from "./media-controls"
 import ChatPanel from "./chat-panel"
@@ -28,7 +27,7 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
   // O useEffect agora gerencia a conexão e desconexão da sala
   useEffect(() => {
     const initializeDailyCall = async () => {
-      // Verifica se o elemento DOM já existe (deve existir agora)
+      // Verifica se o elemento DOM já existe (deve existir agora após a correção no JSX)
       if (!containerRef.current) {
         console.error("[v0] Container DOM não encontrado.")
         return
@@ -42,9 +41,14 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
         const tokenResponse = await fetch("/api/daily-room", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ roomName: `franca-${room.id}` }),
+          body: JSON.stringify({ 
+            roomName: `franca-${room.id}`,
+            // CORREÇÃO CRÍTICA: Envia o nome do usuário para o backend (para corrigir o Erro 500)
+            userName: currentUserName 
+          }),
         })
 
+        // Se houver erro 500, cai aqui
         if (!tokenResponse.ok) {
           throw new Error("Erro ao obter token para a sala")
         }
@@ -60,7 +64,7 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
 
         // 3. Listeners para atualizar a UI
         call.on("participants-changed", () => {
-          setParticipants(Object.values(call.participants()))
+          setParticipants(Object.values(call.participants())) 
         })
 
         call.on("error", (error: any) => {
@@ -73,7 +77,7 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
           url: roomUrl,
           token,
           userName: currentUserName,
-          // CORREÇÃO: Informa ao Daily qual elemento DOM usar para a visualização
+          // CORREÇÃO ANTERIOR: Informa ao Daily qual elemento DOM usar
           parentEl: containerRef.current, 
         })
         
@@ -96,7 +100,7 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
     return () => {
       if (callObject.current) {
         callObject.current.leave() 
-        // CORREÇÃO CRÍTICA: Destroi o objeto e limpa o DOM
+        // CRÍTICO: Destroi o objeto e limpa o DOM
         callObject.current.destroy() 
         callObject.current = null
         setParticipants([])
@@ -140,9 +144,10 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
         {/* Video Container */}
         <div className="flex-1 flex flex-col gap-4 relative">
           
-          {/* CORREÇÃO CRÍTICA: O contêiner com o 'ref' DEVE SER RENDERIZADO SEMPRE 
-             para que o Daily.co possa anexar o vídeo. Usamos 'invisible' para escondê-lo 
-             enquanto o loading/erro está na tela. */}
+          {/* CORREÇÃO ESTRUTURAL: O contêiner com o 'ref' DEVE SER RENDERIZADO SEMPRE. 
+              Classes de Tailwind como 'invisible' e 'absolute inset-0' 
+              são usadas para esconder o elemento e permitir que o loading/erro apareçam por cima, 
+              mas o elemento DOM continua existindo para o Daily.co. */}
           <div
             ref={containerRef}
             className={`bg-gray-100 rounded-lg p-4 flex-1 border-2 border-gray-200 overflow-hidden ${
