@@ -1,56 +1,119 @@
-// app/api/daily-room/route.ts
+// ✅ app/api/daily-room/route.ts
+export const runtime = "nodejs"; // fundamental para acessar process.env
 
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server";
 
-// Certifique-se de que DAILY_API_KEY está configurado em .env.local
-const DAILY_API_KEY = process.env.DAILY_API_KEY
-const DAILY_API_URL = "https://api.daily.co/v1"
-// Corrigido para usar o domínio da Franca Assessoria (se for esse)
-const DAILY_DOMAIN = "https://francaassessoria.daily.co" 
+const DAILY_API_URL = "https://api.daily.co/v1";
 
-export async function POST(request: Request) {
-  try {
-    // CORREÇÃO CRÍTICA: Agora o backend espera receber roomName E userName
-    const { roomName, userName } = await request.json() 
+/**
+ * Cria uma sala no Daily caso ainda não exista
+ */
+async function ensureRoom(roomName: string, apiKey: string) {
+  const getRes = await fetch(`${DAILY_API_URL}/rooms/${roomName}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    cache: "no-store",
+  });
 
-    if (!DAILY_API_KEY) {
-      return NextResponse.json({ error: "API key do Daily não configurada" }, { status: 500 })
-    }
+  if (getRes.ok) {
+    const data = await getRes.json();
+    return data;
+  }
 
-    const response = await fetch(`${DAILY_API_URL}/meeting-tokens`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // A chave de API é crucial para a autenticação
-        Authorization: `Bearer ${DAILY_API_KEY}`, 
+  // Se não existir, cria uma nova sala privada
+  const createRes = await fetch(`${DAILY_API_URL}/rooms`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: roomName,
+      privacy: "private",
+      properties: {
+        enable_chat: true,
+        enable_screenshare: true,
       },
-      body: JSON.stringify({
-        properties: {
-          room_name: roomName,
-          // CORREÇÃO CRÍTICA: Usa o nome de usuário real
-          user_name: userName, 
-        },
-      }),
-    })
+    }),
+  });
 
-    if (!response.ok) {
-      const error = await response.text()
-      // É crucial logar a resposta de erro do Daily para ajudar na depuração
-      console.error("[v0] Daily API error:", response.status, error) 
-      return NextResponse.json({ error: "Erro ao criar token: Verifique o console do backend." }, { status: 500 })
+  if (!createRes.ok) {
+    const errorText = await createRes.text();
+    throw new Error(`Falha ao criar sala (${createRes.status}): ${errorText}`);
+  }
+
+  const data = await createRes.json();
+  return data;
+}
+
+/**
+ * Gera um token de acesso à sala Daily
+ */
+async function createToken(roomName: string, userName: string, apiKey: string) {
+  const res = await fetch(`${DAILY_API_URL}/meeting-tokens`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      properties: {
+        room_name: roomName,
+        user_name: userName || "Convidado",
+        is_owner: false,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Falha ao gerar token (${res.status}): ${errorText}`);
+  }
+
+  const data = await res.json();
+  return data.token;
+}
+
+/**
+ * Endpoint principal (POST /api/daily-room)
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const apiKey = process.env.DAILY_API_KEY;
+    const domain = process.env.NEXT_PUBLIC_DAILY_DOMAIN;
+
+    if (!apiKey || !domain) {
+      console.error("❌ Variáveis de ambiente ausentes", {
+        hasKey: !!apiKey,
+        domain,
+      });
+      return NextResponse.json(
+        { error: "Faltam as variáveis DAILY_API_KEY ou NEXT_PUBLIC_DAILY_DOMAIN" },
+        { status: 500 }
+      );
     }
 
-    const data = await response.json()
-    
-    // Constrói a URL completa da sala para o frontend
-    const roomUrl = `${DAILY_DOMAIN}/${roomName}`
+    const { roomName, userName } = await req.json();
+    if (!roomName) {
+      return NextResponse.json({ error: "roomName é obrigatório" }, { status: 400 });
+    }
+
+    // Garante que a sala existe no Daily
+    const room = await ensureRoom(roomName, apiKey);
+
+    // Gera o token para o usuário
+    const token = await createToken(room.name, userName || "Convidado", apiKey);
+
+    const roomUrl = `https://${domain}/${room.name}`;
 
     return NextResponse.json({
-      token: data.token,
-      roomUrl: roomUrl,
-    })
-  } catch (error) {
-    console.error("[v0] Erro geral ao criar token Daily:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+      token,
+      roomUrl,
+    });
+  } catch (err: any) {
+    console.error("[Daily API] Erro:", err?.message || err);
+    return NextResponse.json(
+      { error: "Erro ao obter token para a sala." },
+      { status: 500 }
+    );
   }
 }
