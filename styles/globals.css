@@ -123,3 +123,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Adicionar ao arquivo CSS Global: */
+
+#daily-video-container div,
+#daily-video-container video {
+    /* Força o elemento a ocupar 100% do div pai */
+    width: 100% !important;
+    height: 100% !important;
+    /* Garante que o vídeo se encaixe sem barras de rolagem */
+    object-fit: cover;
+}

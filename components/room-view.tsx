@@ -27,7 +27,7 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
   // O useEffect agora gerencia a conexão e desconexão da sala
   useEffect(() => {
     const initializeDailyCall = async () => {
-      // Verifica se o elemento DOM já existe (deve existir agora após a correção no JSX)
+      // Verifica se o elemento DOM já existe (agora ele deve existir devido à correção no JSX)
       if (!containerRef.current) {
         console.error("[v0] Container DOM não encontrado.")
         return
@@ -43,12 +43,11 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             roomName: `franca-${room.id}`,
-            // CORREÇÃO CRÍTICA: Envia o nome do usuário para o backend (para corrigir o Erro 500)
+            // Envia o nome do usuário para o backend
             userName: currentUserName 
           }),
         })
 
-        // Se houver erro 500, cai aqui
         if (!tokenResponse.ok) {
           throw new Error("Erro ao obter token para a sala")
         }
@@ -77,8 +76,7 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
           url: roomUrl,
           token,
           userName: currentUserName,
-          // CORREÇÃO ANTERIOR: Informa ao Daily qual elemento DOM usar
-          parentEl: containerRef.current, 
+          parentEl: containerRef.current, // CRÍTICO: Anexa o vídeo ao div
         })
         
         // 5. Define o estado inicial de mic/camera
@@ -100,7 +98,6 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
     return () => {
       if (callObject.current) {
         callObject.current.leave() 
-        // CRÍTICO: Destroi o objeto e limpa o DOM
         callObject.current.destroy() 
         callObject.current = null
         setParticipants([])
@@ -126,6 +123,22 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
 
   return (
     <div className="flex-1 flex flex-col bg-white">
+      
+      {/* INÍCIO: INSTRUÇÃO DE ESTILO GLOBAL NECESSÁRIA */}
+      {/* Para garantir que o vídeo anexado pelo Daily.co apareça, 
+      o desenvolvedor DEVE adicionar o seguinte CSS no arquivo global (app/globals.css):
+      
+      #daily-video-container div,
+      #daily-video-container video {
+          width: 100% !important;
+          height: 100% !important;
+          position: relative !important;
+          object-fit: cover;
+      }
+      
+      */}
+      {/* FIM: INSTRUÇÃO DE ESTILO GLOBAL */}
+
       {/* Room Header */}
       <div className="bg-[#081534] text-white px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
@@ -144,11 +157,9 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
         {/* Video Container */}
         <div className="flex-1 flex flex-col gap-4 relative">
           
-          {/* CORREÇÃO ESTRUTURAL: O contêiner com o 'ref' DEVE SER RENDERIZADO SEMPRE. 
-              Classes de Tailwind como 'invisible' e 'absolute inset-0' 
-              são usadas para esconder o elemento e permitir que o loading/erro apareçam por cima, 
-              mas o elemento DOM continua existindo para o Daily.co. */}
+          {/* CORREÇÃO ESTRUTURAL + ID PARA ESTILO: Este contêiner é o pai do vídeo */}
           <div
+            id="daily-video-container" // ID CRÍTICO ADICIONADO PARA O CSS GLOBAL
             ref={containerRef}
             className={`bg-gray-100 rounded-lg p-4 flex-1 border-2 border-gray-200 overflow-hidden ${
                 isLoading || error ? 'invisible absolute inset-0' : ''
@@ -156,7 +167,7 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
             style={{ minHeight: "400px" }}
           />
 
-          {/* Feedback Visual: Carregando/Erro (renderizado condicionalmente) */}
+          {/* Feedback Visual: Carregando/Erro (sobreposto) */}
           {isLoading && (
             <div className="bg-gray-100 rounded-lg p-4 flex-1 flex items-center justify-center border-2 border-gray-200 absolute inset-0">
               <div className="text-center">
