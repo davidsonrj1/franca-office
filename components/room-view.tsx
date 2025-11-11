@@ -24,13 +24,17 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // O useEffect agora gerencia a conexão e desconexão da sala
   useEffect(() => {
     const initializeDailyCall = async () => {
+      // Garante que o container existe
+      if (!containerRef.current) return
+
       try {
         setIsLoading(true)
         setError(null)
 
-        // Obter token para a sala
+        // 1. Obter token para a sala (assume-se que o backend já foi corrigido para retornar a roomUrl correta)
         const tokenResponse = await fetch("/api/daily-room", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -43,15 +47,16 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
 
         const { token, roomUrl } = await tokenResponse.json()
 
+        // 2. Cria o objeto de chamada
         const call = DailyIframe.createCallObject({
           dailyJsVersion: ">=0.75.3",
         })
 
         callObject.current = call
 
-        // Listen to participants updates
-        call.on("participants-changed", ({ participants }: any) => {
-          setParticipants(Object.values(participants))
+        // 3. Listeners para atualizar a UI
+        call.on("participants-changed", () => {
+          setParticipants(Object.values(call.participants()))
         })
 
         call.on("error", (error: any) => {
@@ -59,29 +64,44 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
           setError("Erro na chamada. Tente novamente.")
         })
 
+        // 4. Entrar na sala, ANEXANDO o vídeo ao container
         await call.join({
           url: roomUrl,
           token,
+          userName: currentUserName,
+          // CORREÇÃO: Informa ao Daily qual elemento DOM usar para a visualização
+          parentEl: containerRef.current, 
         })
+        
+        // 5. Define o estado inicial de mic/camera
+        await call.setLocalAudio(!isMuted);
+        await call.setLocalVideo(!isCameraOff);
 
         setIsLoading(false)
+
       } catch (err) {
         console.error("[v0] Erro ao inicializar Daily:", err)
-        setError("Erro ao conectar à sala")
+        // Mensagem mais detalhada
+        setError("Erro ao conectar à sala. Verifique o console ou tente novamente.") 
         setIsLoading(false)
       }
     }
 
-    if (containerRef.current) {
-      initializeDailyCall()
-    }
+    initializeDailyCall()
 
+    // 6. Cleanup function (Executa ao trocar de sala ou desmontar o componente)
     return () => {
       if (callObject.current) {
-        callObject.current.leave()
+        // Leave: notifica outros participantes
+        callObject.current.leave() 
+        // CORREÇÃO CRÍTICA: Destroi o objeto e limpa o DOM
+        callObject.current.destroy() 
+        callObject.current = null
+        setParticipants([])
       }
     }
-  }, [room.id])
+    // Adicionado currentUserName e estados de mídia como dependências
+  }, [room.id, currentUserName, isMuted, isCameraOff]) 
 
   const handleToggleMute = async () => {
     if (callObject.current) {

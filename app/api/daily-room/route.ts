@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 
 const DAILY_API_KEY = process.env.DAILY_API_KEY
 const DAILY_API_URL = "https://api.daily.co/v1"
+// VARIÁVEL ADICIONADA: Seu domínio Daily.co (visto na imagem)
+const DAILY_DOMAIN = "https://francaassessoria.daily.co" 
 
 export async function POST(request: Request) {
   try {
@@ -32,9 +34,13 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json()
+    
+    // CORREÇÃO: Monta a URL da sala corretamente (Domínio/Nome da Sala)
+    const roomUrl = `${DAILY_DOMAIN}/${roomName}`
+
     return NextResponse.json({
       token: data.token,
-      roomUrl: `https://${roomName}.daily.co`,
+      roomUrl: roomUrl,
     })
   } catch (error) {
     console.error("[v0] Erro ao criar token Daily:", error)
