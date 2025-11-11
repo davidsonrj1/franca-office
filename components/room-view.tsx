@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import DailyIframe from "@daily-co/daily-js"
+// Certifique-se de que a importação do DailyIframe esteja correta
+import DailyIframe from "@daily-co/daily-js" 
 import MediaControls from "./media-controls"
 import ChatPanel from "./chat-panel"
 
@@ -27,14 +28,17 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
   // O useEffect agora gerencia a conexão e desconexão da sala
   useEffect(() => {
     const initializeDailyCall = async () => {
-      // Garante que o container existe
-      if (!containerRef.current) return
+      // Verifica se o elemento DOM já existe (deve existir agora)
+      if (!containerRef.current) {
+        console.error("[v0] Container DOM não encontrado.")
+        return
+      }
 
       try {
         setIsLoading(true)
         setError(null)
 
-        // 1. Obter token para a sala (assume-se que o backend já foi corrigido para retornar a roomUrl correta)
+        // 1. Obter token para a sala
         const tokenResponse = await fetch("/api/daily-room", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -81,7 +85,6 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
 
       } catch (err) {
         console.error("[v0] Erro ao inicializar Daily:", err)
-        // Mensagem mais detalhada
         setError("Erro ao conectar à sala. Verifique o console ou tente novamente.") 
         setIsLoading(false)
       }
@@ -92,7 +95,6 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
     // 6. Cleanup function (Executa ao trocar de sala ou desmontar o componente)
     return () => {
       if (callObject.current) {
-        // Leave: notifica outros participantes
         callObject.current.leave() 
         // CORREÇÃO CRÍTICA: Destroi o objeto e limpa o DOM
         callObject.current.destroy() 
@@ -100,7 +102,6 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
         setParticipants([])
       }
     }
-    // Adicionado currentUserName e estados de mídia como dependências
   }, [room.id, currentUserName, isMuted, isCameraOff]) 
 
   const handleToggleMute = async () => {
@@ -137,9 +138,22 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
 
       <div className="flex-1 flex gap-6 p-6 overflow-hidden">
         {/* Video Container */}
-        <div className="flex-1 flex flex-col gap-4">
+        <div className="flex-1 flex flex-col gap-4 relative">
+          
+          {/* CORREÇÃO CRÍTICA: O contêiner com o 'ref' DEVE SER RENDERIZADO SEMPRE 
+             para que o Daily.co possa anexar o vídeo. Usamos 'invisible' para escondê-lo 
+             enquanto o loading/erro está na tela. */}
+          <div
+            ref={containerRef}
+            className={`bg-gray-100 rounded-lg p-4 flex-1 border-2 border-gray-200 overflow-hidden ${
+                isLoading || error ? 'invisible absolute inset-0' : ''
+            }`}
+            style={{ minHeight: "400px" }}
+          />
+
+          {/* Feedback Visual: Carregando/Erro (renderizado condicionalmente) */}
           {isLoading && (
-            <div className="bg-gray-100 rounded-lg p-4 flex-1 flex items-center justify-center border-2 border-gray-200">
+            <div className="bg-gray-100 rounded-lg p-4 flex-1 flex items-center justify-center border-2 border-gray-200 absolute inset-0">
               <div className="text-center">
                 <div className="animate-spin text-4xl mb-4">⏳</div>
                 <p className="text-gray-600 font-medium">Conectando à sala...</p>
@@ -148,19 +162,11 @@ export default function RoomView({ room, usersInRoom, currentUserName }: RoomVie
           )}
 
           {error && (
-            <div className="bg-red-100 rounded-lg p-4 flex-1 flex items-center justify-center border-2 border-red-300">
+            <div className="bg-red-100 rounded-lg p-4 flex-1 flex items-center justify-center border-2 border-red-300 absolute inset-0">
               <div className="text-center">
                 <p className="text-red-600 font-medium">{error}</p>
               </div>
             </div>
-          )}
-
-          {!isLoading && !error && (
-            <div
-              ref={containerRef}
-              className="bg-gray-100 rounded-lg p-4 flex-1 border-2 border-gray-200 overflow-hidden"
-              style={{ minHeight: "400px" }}
-            />
           )}
 
           {/* Active Users */}
