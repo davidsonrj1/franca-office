@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import RoomList from "./room-list"
 import RoomView from "./room-view"
 
@@ -29,24 +29,65 @@ export default function CommunicationHub({
     leonardo: [],
     guilherme: [],
     davidson: [],
-    reunion: [userName],
+    reunion: [],
   })
+  const [lastUpdate, setLastUpdate] = useState(0)
 
-  const handleJoinRoom = (roomId: string) => {
-    // Remove user from previous room
-    setUsersInRooms((prev) => ({
-      ...prev,
-      [currentRoom]: prev[currentRoom].filter((u) => u !== userName),
-    }))
+  useEffect(() => {
+    const syncUsers = async () => {
+      try {
+        const updates: Record<string, string[]> = {}
+        for (const room of ROOMS) {
+          const response = await fetch(`/api/sync-room?room=${room.id}`)
+          const data = await response.json()
+          updates[room.id] = data.users || []
+        }
+        setUsersInRooms(updates)
+      } catch (error) {
+        console.log("[v0] Erro ao sincronizar usuários:", error)
+      }
+    }
 
-    // Add user to new room
-    setUsersInRooms((prev) => ({
-      ...prev,
-      [roomId]: prev[roomId].includes(userName) ? prev[roomId] : [...prev[roomId], userName],
-    }))
+    syncUsers()
+    const interval = setInterval(syncUsers, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleJoinRoom = async (roomId: string) => {
+    // Remove do Redis
+    try {
+      await fetch("/api/sync-room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "leave",
+          room: currentRoom,
+          userName,
+        }),
+      })
+
+      // Adiciona à nova sala
+      await fetch("/api/sync-room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "join",
+          room: roomId,
+          userName,
+        }),
+      })
+    } catch (error) {
+      console.log("[v0] Erro ao trocar de sala:", error)
+    }
 
     setCurrentRoom(roomId)
+    setLastUpdate(Date.now())
   }
+
+  // Quando montar, adicionar usuário à sala padrão
+  useEffect(() => {
+    handleJoinRoom(currentRoom)
+  }, [])
 
   const currentRoomData = ROOMS.find((r) => r.id === currentRoom)
   const usersInCurrentRoom = usersInRooms[currentRoom] || []

@@ -39,13 +39,33 @@ export default function Home() {
 
 function LoginScreen({ onStart }: { onStart: (id: string, name: string) => void }) {
   const [selectedName, setSelectedName] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
 
-  const users = ["Gabriel", "Bruna", "Leonardo", "Guilherme", "Davidson"]
+  const credentials: Record<string, string> = {
+    Gabriel: "gabriel@2025",
+    Bruna: "bruna@2025",
+    Leonardo: "leo@2025",
+    Guilherme: "gui@2025",
+    Davidson: "deivin@2025",
+  }
+
+  const users = Object.keys(credentials)
 
   const handleLogin = () => {
-    if (selectedName) {
-      onStart(Math.random().toString(), selectedName)
+    if (!selectedName || !password) {
+      setError("Selecione seu nome e digite a senha")
+      return
     }
+
+    const correctPassword = credentials[selectedName]
+    if (password !== correctPassword) {
+      setError("Senha incorreta")
+      return
+    }
+
+    setError("")
+    onStart(Math.random().toString(), selectedName)
   }
 
   return (
@@ -61,7 +81,11 @@ function LoginScreen({ onStart }: { onStart: (id: string, name: string) => void 
             <span className="text-sm font-semibold text-[#081534] mb-3 block">Selecione seu nome:</span>
             <select
               value={selectedName}
-              onChange={(e) => setSelectedName(e.target.value)}
+              onChange={(e) => {
+                setSelectedName(e.target.value)
+                setPassword("")
+                setError("")
+              }}
               className="w-full px-4 py-3 border-2 border-[#7DE08D] rounded-lg focus:outline-none focus:border-[#7DE08D] bg-white text-[#081534] font-medium"
             >
               <option value="">Escolha um nome</option>
@@ -73,9 +97,28 @@ function LoginScreen({ onStart }: { onStart: (id: string, name: string) => void 
             </select>
           </label>
 
+          {selectedName && (
+            <label className="block animate-in fade-in">
+              <span className="text-sm font-semibold text-[#081534] mb-3 block">Digite sua senha:</span>
+              <input
+                type="password"
+                placeholder="Senha"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setError("")
+                }}
+                onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+                className="w-full px-4 py-3 border-2 border-[#7DE08D] rounded-lg focus:outline-none focus:border-[#7DE08D] bg-white text-[#081534] font-medium"
+              />
+            </label>
+          )}
+
+          {error && <div className="bg-red-100 text-red-600 text-sm px-4 py-3 rounded-lg">{error}</div>}
+
           <button
             onClick={handleLogin}
-            disabled={!selectedName}
+            disabled={!selectedName || !password}
             className="w-full bg-[#7DE08D] hover:bg-[#6fd87d] disabled:bg-gray-300 text-[#081534] font-bold py-3 rounded-lg transition-colors"
           >
             Entrar

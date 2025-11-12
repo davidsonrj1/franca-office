@@ -19,30 +19,51 @@ export default function ChatPanel({ roomId, currentUserName }: ChatPanelProps) {
   const [inputText, setInputText] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    const syncMessages = async () => {
+      try {
+        const response = await fetch(`/api/chat-message?room=${roomId}`)
+        const data = await response.json()
+        setMessages(data.messages || [])
+      } catch (error) {
+        console.log("[v0] Erro ao sincronizar mensagens:", error)
+      }
+    }
+
+    syncMessages()
+    const interval = setInterval(syncMessages, 2000)
+    return () => clearInterval(interval)
+  }, [roomId])
+
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputText.trim()) return
 
-    const newMessage: Message = {
-      id: Math.random().toString(),
-      userName: currentUserName,
-      text: inputText,
-      timestamp: Date.now(),
+    try {
+      await fetch("/api/chat-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room: roomId,
+          userName: currentUserName,
+          text: inputText,
+        }),
+      })
+      setInputText("")
+    } catch (error) {
+      console.log("[v0] Erro ao enviar mensagem:", error)
     }
-
-    setMessages((prev) => [...prev, newMessage])
-    setInputText("")
   }
 
   return (
     <div className="w-80 bg-[#f0f8f5] border-l border-[#e0e8e4] rounded-lg flex flex-col overflow-hidden">
       {/* Chat Header */}
       <div className="bg-[#081534] text-white px-4 py-3 border-b border-[#e0e8e4]">
-        <h3 className="font-bold text-sm">💬 Chat</h3>
+        <h3 className="font-bold text-sm">Chat</h3>
         <p className="text-xs text-gray-300 mt-1">Sala: {roomId}</p>
       </div>
 
